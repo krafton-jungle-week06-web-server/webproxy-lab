@@ -51,7 +51,7 @@ void doit(int fd)
   rio_t rio;
 
   // request line과 header를 읽는다.
-  Rio_readintitb(&rio, fd);
+  Rio_readinitb(&rio, fd);
   Rio_readlineb(&rio, buf, MAXLINE);
   printf("Request headers:\n");
   printf("%s",buf);
@@ -74,7 +74,7 @@ void doit(int fd)
       clienterror(fd, filename, "403", "Forbidden", "Tiny couldn't read the file");
       return;
     }
-    serve_staic(fd, filename, sbuf.st_size);
+    serve_static(fd, filename, sbuf.st_size);
   }
   else{ // 동적 컨텐츠 serve하기
     if (!(S_ISREG(sbuf.st_mode)) || !(S_IXUSR & sbuf.st_mode)){ // 파일이 있어도 접근할 수 없다면? 인 듯
