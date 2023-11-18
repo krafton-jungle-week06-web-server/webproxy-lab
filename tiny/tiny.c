@@ -148,10 +148,63 @@ int parse_uri(char *uri, char *filename, char *cgiargs)
 }
 
 void serve_static(int fd, char *filename, int filesize)
-{}
+{
+  int srcfd;
+  char *srcp, filetype[MAXLINE], buf[MAXBUF];
 
+  // 클라이언트에게 응답 헤더(response header)를 보낸다.
+  get_filetype(filename, filetype);
+  sprintf(buf, "HTTP/1.0 200 OK\r\n");
+  sprintf(buf, "%sServer: Tiny Web Server\r\n", buf);
+  sprintf(buf, "%sConnection: close\r\n", buf);
+  sprintf(buf, "%sContent-length: %d\r\n", buf, filesize);
+  sprintf(buf, "%sContent-type: %s\r\n\r\n", buf, filetype);
+  Rio_writen(fd, buf, strlen(buf)); // 클라이언트에 보내기
+  printf("Response headers:\n");
+  printf("%s", buf);
+
+  // 클라이언트에게 응답 본체(response body)를 보낸다.
+  srcfd = Open(filename, O_RDONLY, 0); // 파일 열기
+  srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0); // 식별자랑 파일 정보들 매핑
+  Close(srcfd); // 파일 닫기
+  Rio_writen(fd, srcp, filesize); // 클라이언트에 보내기
+  Munmap(srcp, filesize); // 매핑 삭제
+}
+
+// file name으로부터 file type을 얻는다.
 void get_filetype(char *filename, char *filetype)
-{}
+{
+  if (strstr(filename, ".html")){
+    strcpy(filetype, "text/html");
+  }
+  else if (strstr(filename, ".gif")){
+    strcpy(filetype, "image/gif");
+  }
+  else if (strstr(filename, ".png")){
+    strcpy(filetype, "image/png");
+  }
+  else if (strstr(filename, ".jpg")){
+    strcpy(filetype, "image/jpeg");
+  }
+  else{
+    strcpy(filetype, "text/plain");
+  }
+}
 
 void serve_dynamic(int fd, char *filename, char *cgiargs)
-{}
+{
+  char buf[MAXLINE], *emptylist[] = { NULL };
+
+  // HTTP 응답의 첫 번째 파트 반환
+  sprintf(buf, "HTTP/1.0 200 OK\r\n");
+  Rio_writen(fd, buf, strlen(buf));
+  sprintf(buf, "Server: Tiny Web Server\r\n");
+  Rio_writen(fd, buf, strlen(buf));
+
+  if (Fork()==0){ // 자식
+    setenv("QUERY_STRING", cgiargs, 1);
+    Dup2(fd, STDOUT_FILENO); // 클라이언트에게 표준 출력 redirect
+    Execve(filename, emptylist, environ); // CGI 프로그램 실행
+  }
+  Wait(NULL); // 부모가 자식을 기다리고 회수한다. doit 함수에서 한 번에 한 개의 HTTP 트랜잭션만 처리하기 때문이다.
+}
