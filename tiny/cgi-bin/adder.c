@@ -8,6 +8,7 @@ int main(void) {
   char *buf, *p;
   char arg1[MAXLINE], arg2[MAXLINE], content[MAXLINE];
   int n1=0, n2=0;
+  char *method; 
 
 // 인자 추출
   if ((buf = getenv("QUERY_STRING")) != NULL) {
@@ -31,7 +32,10 @@ int main(void) {
   printf("Content-length: %d\r\n", (int)strlen(content));
   printf("Content-type: text/html\r\n\r\n");
   printf("%s", content);
-  fflush(stdout);
+  
+  method = getenv("METHOD");
+  if (strcmp(method,"GET") == 0)
+    fflush(stdout);
 
   exit(0);
 }
