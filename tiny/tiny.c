@@ -171,6 +171,22 @@ void serve_static(char *method, int fd, char *filename, int filesize)
     Rio_writen(fd, srcp, filesize); // 클라이언트에 보내기
     Munmap(srcp, filesize); // 매핑 삭제
   }
+
+  /* Mmap => malloc 구현*/
+  /*
+  if (strcmp(method, "GET") == 0) {
+  // 클라이언트에게 응답 본체(response body)를 보낸다.
+    srcfd = Open(filename, O_RDONLY, 0); // 파일 열기
+    //srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0); // 식별자랑 파일 정보들 매핑
+    srcp = (char *)malloc(filesize);
+    Rio_readn(srcfd, srcp, filesize);
+    
+    Close(srcfd); // 파일 닫기
+    Rio_writen(fd, srcp, filesize); // 클라이언트에 보내기
+    
+    free(srcp);
+  }
+  */
 }
 
 // file name으로부터 file type을 얻는다.
