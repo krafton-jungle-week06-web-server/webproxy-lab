@@ -5,8 +5,6 @@
 #define MAX_CACHE_SIZE 1049000
 #define MAX_OBJECT_SIZE 102400
 
-static char method[MAXLINE];
-static char uri[MAXLINE];
 
 void doit(int fd);
 void read_requesthdrs(rio_t *rp);
@@ -16,7 +14,7 @@ void get_filetype(char *filename, char *filetype);
 void serve_dynamic(char *method, int fd, char *filename, char *cgiargs);
 void clienterror(int fd, char *cause, char *errnum, char *shortmsg,
                  char *longmsg);
-void proxy_to_tiny(char *server_name, char *server_port, char *uri);
+void proxy_to_tiny(char *server_name, char *server_port, char *uri, int fd);
 
 
 /* You won't lose style points for including this long line in your code */
@@ -55,22 +53,22 @@ int main(int argc, char **argv) {
   return 0;
 }
 
-void doit(int fd)
+void doit(int proxy_connfd)
 {
   int is_static;
   struct stat sbuf;
-  char buf[MAXLINE], version[MAXLINE];
+  char buf[MAXLINE], version[MAXLINE], method[MAXLINE], uri[MAXLINE];
   char filename[MAXLINE], cgiargs[MAXLINE], server_name[MAXLINE], server_port[MAXLINE];
   rio_t rio;
 
   // request line과 header를 읽는다.
-  Rio_readinitb(&rio, fd);
+  Rio_readinitb(&rio, proxy_connfd);
   Rio_readlineb(&rio, buf, MAXLINE);
   printf("Request headers:\n");
   printf("%s",buf);
   sscanf(buf, "%s %s %s", method, uri, version);
   if ((strcasecmp(method, "GET") !=0) && (strcasecmp(method, "HEAD") !=0)) { // method가 HEAD나 GET이 아닐 때
-    clienterror(fd, method, "501", "Not implemented", "Proxy does not implement this method");
+    clienterror(proxy_connfd, method, "501", "Not implemented", "Proxy does not implement this method");
     return;
   }
   read_requesthdrs(&rio);
@@ -79,7 +77,7 @@ void doit(int fd)
   // GET tiny:9999/cgi-bin/adder?123&456 HTTP/1.1
   parse_uri(server_name, server_port, uri, filename, cgiargs);
 
-  proxy_to_tiny(server_name, server_port, uri);
+  proxy_to_tiny(server_name, server_port, uri, proxy_connfd);
   /*
   if (stat(filename, &sbuf)<0){ // 파일이 없으면? 인 듯
     clienterror(fd, filename, "404", "Not found", "Tiny couldn't find this file");
@@ -140,63 +138,37 @@ void read_requesthdrs(rio_t *rp) // tiny는 요청 헤더 내의 어떤 정보�
 
 
 
-int parse_uri(char *server_name, char *server_port, char *uri_constant, char *filename, char *cgiargs)
+int parse_uri(char *server_name, char *server_port, char *uri, char *filename, char *cgiargs)
 {
-  char *ptr;
-  char uri_arr[MAXLINE];
-  // uri : "tiny:9999/cgi-bin/adder?123&456"
-  strcpy(uri_arr, uri_constant);
-  char slash = '/'; // uri의 앞부분이 될 슬래시
-  char uri[MAXLINE];
+    char uri2[100];
+    strcpy(uri2, uri);
+    
+    char uri_with_slash[100];
+    uri_with_slash[0] = '/'; // '/' 문자 추가
+    uri_with_slash[1] = '\0'; // 문자열 끝을 표시
+    
+    // ':'를 구분자로 tiny를 구한다
+    server_name = strtok(uri2, ":");
+    // '/'를 구분자로 9999를 구한다
+    server_port = strtok(NULL, "/");
+    // 남은 부분을 그대로 uri2에 저장한다
+    char *uri_no_slash = strtok(NULL, "");
+    // 기존 문자열을 새로운 문자열에 이어붙임
+    
+    strcat(uri_with_slash, uri_no_slash);    // 결과 출력
+    
+    printf("server_name: %s\n", server_name);
+    printf("server_port: %s\n", server_port);
+    printf("uri_with_slash: %s\n", uri_with_slash);
+    strcpy(uri,uri_with_slash);
+    printf("uri: %s\n", uri);
 
-  // '/' 문자 추가
-  uri[0] = slash; // '/' 문자 추가
-  uri[1] = '\0'; // 문자열 끝을 표시
-  
-  // ':'를 구분자로 tiny를 구한다
-  server_name = strtok(uri, ":");
-  
-  // '/'를 구분자로 9999를 구한다
-  server_port = strtok(NULL, "/");
-  
-  // 남은 부분을 그대로 uri2에 저장한다
-  char *uri_no_slash = strtok(NULL, "");
-  // 기존 문자열을 새로운 문자열에 이어붙임
-  strcat(uri, uri_no_slash);
-
-  // server_name, server_port, uri
-  // tiny, 9999, /cgi-bin/adder?123&456
-
-
-  // GET tiny:9999/ HTTP/1.1
-  if (!strstr(uri, "cgi-bin")){ // 정적 컨텐츠
-
-    strcpy(cgiargs, "");
-    strcpy(filename, ".");
-    strcat(filename, uri);
-    if (uri[strlen(uri)-1] == '/'){
-      strcat(filename, "home.html");
-    }
-    return 1;
-  }
-  // GET tiny:9999/cgi-bin/adder?123&456 HTTP/1.1
-  else{ // 동적 컨텐츠 
-    ptr = index(uri, '?'); // uri에서 ? 위치(인덱스) 뽑아줌
-    if (ptr){
-      strcpy(cgiargs, ptr+1);
-      *ptr='\0';
-    }
-    else{
-      strcpy(cgiargs, "");
-    }
-    strcpy(filename, ".");
-    strcat(filename, uri);
     return 0;
-  }
 }
 
-void proxy_to_tiny(char *server_name, char *server_port, char *uri){
-    int clientfd;   //소켓식별자
+
+void proxy_to_tiny(char *server_name, char *server_port, char *uri, int proxy_fd){
+    int server_fd;   //소켓식별자
     char *host, *port, buf[MAXLINE];
     rio_t rio;
 
@@ -207,22 +179,29 @@ void proxy_to_tiny(char *server_name, char *server_port, char *uri){
     host = server_name;     // 서버의 IP주소
     port = server_port;     // 서버의 포트
 
-    clientfd = Open_clientfd(host, port);
-    Rio_readinitb(&rio, clientfd);
+    server_fd = Open_clientfd(host, port);
+    Rio_readinitb(&rio, server_fd);
 
+     // 클라이언트가 보낸 요청을 tiny 서버에 전달
+    sprintf(buf, "GET %s HTTP/1.1\r\n", uri);
+    // sprintf(buf, "%sHost: %s\r\n", buf, host);
+    // sprintf(buf, "%sConnection: close\r\n", buf);
+    // sprintf(buf, "%s\r\n", buf);
+    Rio_writen(server_fd, buf, strlen(buf));
 
-    typedef struct {
-
-    } files;
-
-    while (Fgets(buf, MAXLINE, stdin) != NULL) {
-
-        Rio_writen(clientfd, buf, strlen(buf));
-        Rio_readlineb(&rio, buf, MAXLINE);
-        Fputs(buf, stdout);
+    // tiny 서버로부터의 응답을 클라이언트에 전달
+    while (Rio_readlineb(&rio, buf, MAXLINE) > 0) {
+        Rio_writen(proxy_fd, buf, strlen(buf));
     }
-    Close(clientfd);
-    exit(0);
+
+    // while (Fgets(buf, MAXLINE, uri) != NULL) {
+
+    //     Rio_writen(clientfd, buf, strlen(buf));
+    //     Rio_readlineb(&rio, buf, MAXLINE);
+    //     Fputs(buf, stdout);
+    // }
+    // Close(clientfd);
+    // exit(0);
 }
 
 
