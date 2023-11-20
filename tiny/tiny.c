@@ -189,7 +189,7 @@ void get_filetype(char *filename, char *filetype)
     strcpy(filetype, "image/jpeg");
   }
   else if (strstr(filename, ".mp4")){
-    strcpy(filetype, "video/mpeg");
+    strcpy(filetype, "video/mp4");
   }
   else{
     strcpy(filetype, "text/plain");
