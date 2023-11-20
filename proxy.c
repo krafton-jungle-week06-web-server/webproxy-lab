@@ -14,8 +14,12 @@ void get_filetype(char *filename, char *filetype);
 void serve_dynamic(char *method, int fd, char *filename, char *cgiargs);
 void clienterror(int fd, char *cause, char *errnum, char *shortmsg,
                  char *longmsg);
+<<<<<<< HEAD
+=======
 void proxy_to_tiny(char *server_name, char *server_port, char *uri, int fd);
+>>>>>>> ca35c0b9baf5090bf269211b1aa6b5126d2bb8e3
 
+void proxy_to_tiny(char *server_name, char *server_port, char *uri, int proxy_fd);
 
 /* You won't lose style points for including this long line in your code */
 static const char *user_agent_hdr =
@@ -138,6 +142,38 @@ void read_requesthdrs(rio_t *rp) // tiny는 요청 헤더 내의 어떤 정보�
 
 
 
+<<<<<<< HEAD
+int parse_uri(char *server_name, char *server_port, char *uri, char *filename, char *cgiargs){
+    char uri2[100];
+    // ':'를 구분자로 tiny를 구한다
+    strcpy(uri2,uri);
+    server_name = strtok(uri2, ":");
+    // '/'를 구분자로 9999를 구한다
+    // printf("%s\n",server_name);
+    server_port = strtok(NULL, "/");
+    // printf("%s\n",server_port);
+
+    if (uri[strlen(uri)-1] == '/'){
+        strcpy(uri,"/");
+        printf("%s\n",uri);
+    }
+    else{
+        char uri_with_slash[100];
+        uri_with_slash[0] = '/'; // '/' 문자 추가
+        uri_with_slash[1] = '\0'; // 문자열 끝을 표시
+        // 남은 부분을 그대로 uri2에 저장한다
+        // printf("%s\n",server_port);
+        // printf("%s\n",uri);
+        char *uri_no_slash = strtok(NULL, "");
+        // 기존 문자열을 새로운 문자열에 이어붙임
+        strcat(uri_with_slash, uri_no_slash);    // 결과 출력
+        // printf("uri_with_slash: %s\n", uri_with_slash);
+        strcpy(uri,uri_with_slash);
+    }
+    return 0;
+}
+
+=======
 int parse_uri(char *server_name, char *server_port, char *uri, char *filename, char *cgiargs)
 {
     char uri2[100];
@@ -167,20 +203,18 @@ int parse_uri(char *server_name, char *server_port, char *uri, char *filename, c
 }
 
 
+>>>>>>> ca35c0b9baf5090bf269211b1aa6b5126d2bb8e3
 void proxy_to_tiny(char *server_name, char *server_port, char *uri, int proxy_fd){
     int server_fd;   //소켓식별자
     char *host, *port, buf[MAXLINE];
     rio_t rio;
 
-    // if(argc!=3){
-    //     fprintf(stderr, "uage: %s <host> <port>\n", argv[0]);
-    //     exit(0);
-    // }
     host = server_name;     // 서버의 IP주소
     port = server_port;     // 서버의 포트
 
     server_fd = Open_clientfd(host, port);
     Rio_readinitb(&rio, server_fd);
+<<<<<<< HEAD
 
      // 클라이언트가 보낸 요청을 tiny 서버에 전달
     sprintf(buf, "GET %s HTTP/1.1\r\n", uri);
@@ -189,10 +223,22 @@ void proxy_to_tiny(char *server_name, char *server_port, char *uri, int proxy_fd
     // sprintf(buf, "%s\r\n", buf);
     Rio_writen(server_fd, buf, strlen(buf));
 
+=======
+
+     // 클라이언트가 보낸 요청을 tiny 서버에 전달
+    sprintf(buf, "GET %s HTTP/1.1\r\n", uri);
+    // sprintf(buf, "%sHost: %s\r\n", buf, host);
+    // sprintf(buf, "%sConnection: close\r\n", buf);
+    // sprintf(buf, "%s\r\n", buf);
+    Rio_writen(server_fd, buf, strlen(buf));
+
+>>>>>>> ca35c0b9baf5090bf269211b1aa6b5126d2bb8e3
     // tiny 서버로부터의 응답을 클라이언트에 전달
     while (Rio_readlineb(&rio, buf, MAXLINE) > 0) {
         Rio_writen(proxy_fd, buf, strlen(buf));
     }
+<<<<<<< HEAD
+=======
 
     // while (Fgets(buf, MAXLINE, uri) != NULL) {
 
@@ -203,48 +249,10 @@ void proxy_to_tiny(char *server_name, char *server_port, char *uri, int proxy_fd
     // Close(clientfd);
     // exit(0);
 }
+>>>>>>> ca35c0b9baf5090bf269211b1aa6b5126d2bb8e3
 
-
-void serve_static(char *method, int fd, char *filename, int filesize)
-{
-  int srcfd;
-  char *srcp, filetype[MAXLINE], buf[MAXBUF];
-
-  // 클라이언트에게 응답 헤더(response header)를 보낸다.
-  get_filetype(filename, filetype);
-  sprintf(buf, "HTTP/1.0 200 OK\r\n");
-  sprintf(buf, "%sServer: Tiny Web Server\r\n", buf);
-  sprintf(buf, "%sConnection: close\r\n", buf);
-  sprintf(buf, "%sContent-length: %d\r\n", buf, filesize);
-  sprintf(buf, "%sContent-type: %s\r\n\r\n", buf, filetype);
-  Rio_writen(fd, buf, strlen(buf)); // 클라이언트에 보내기
-  printf("Response headers:\n");
-  printf("%s", buf);
-
-  if (strcmp(method, "GET") == 0) {
-  // 클라이언트에게 응답 본체(response body)를 보낸다.
-    srcfd = Open(filename, O_RDONLY, 0); // 파일 열기
-    srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0); // 식별자랑 파일 정보들 매핑
-    Close(srcfd); // 파일 닫기
-    Rio_writen(fd, srcp, filesize); // 클라이언트에 보내기
-    Munmap(srcp, filesize); // 매핑 삭제
-  }
-
-  /* Mmap => malloc 구현*/
-  /*
-  if (strcmp(method, "GET") == 0) {
-  // 클라이언트에게 응답 본체(response body)를 보낸다.
-    srcfd = Open(filename, O_RDONLY, 0); // 파일 열기
-    //srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0); // 식별자랑 파일 정보들 매핑
-    srcp = (char *)malloc(filesize);
-    Rio_readn(srcfd, srcp, filesize);
-    
-    Close(srcfd); // 파일 닫기
-    Rio_writen(fd, srcp, filesize); // 클라이언트에 보내기
-    
-    free(srcp);
-  }
-  */
+    // Close(server_fd);
+    // exit(0);
 }
 
 // file name으로부터 file type을 얻는다.
@@ -268,23 +276,4 @@ void get_filetype(char *filename, char *filetype)
   else{
     strcpy(filetype, "text/plain");
   }
-}
-
-void serve_dynamic(char *method, int fd, char *filename, char *cgiargs)
-{
-  char buf[MAXLINE], *emptylist[] = { NULL };
-
-  // HTTP 응답의 첫 번째 파트 반환
-  sprintf(buf, "HTTP/1.0 200 OK\r\n");
-  Rio_writen(fd, buf, strlen(buf));
-  sprintf(buf, "Server: Tiny Web Server\r\n");
-  Rio_writen(fd, buf, strlen(buf));
-
-  if (Fork()==0){ // 자식
-    setenv("METHOD", method, 1);
-    setenv("QUERY_STRING", cgiargs, 1);
-    Dup2(fd, STDOUT_FILENO); // 클라이언트에게 표준 출력 redirect
-    Execve(filename, emptylist, environ); // CGI 프로그램 실행
-  }
-  Wait(NULL); // 부모가 자식을 기다리고 회수한다. doit 함수에서 한 번에 한 개의 HTTP 트랜잭션만 처리하기 때문이다.
 }
