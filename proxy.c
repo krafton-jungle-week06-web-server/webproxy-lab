@@ -14,10 +14,6 @@ void get_filetype(char *filename, char *filetype);
 void serve_dynamic(char *method, int fd, char *filename, char *cgiargs);
 void clienterror(int fd, char *cause, char *errnum, char *shortmsg,
                  char *longmsg);
-<<<<<<< HEAD
-=======
-void proxy_to_tiny(char *server_name, char *server_port, char *uri, int fd);
->>>>>>> ca35c0b9baf5090bf269211b1aa6b5126d2bb8e3
 
 void proxy_to_tiny(char *server_name, char *server_port, char *uri, int proxy_fd);
 
@@ -69,7 +65,6 @@ void doit(int proxy_connfd)
   Rio_readinitb(&rio, proxy_connfd);
   Rio_readlineb(&rio, buf, MAXLINE);
   printf("Request headers:\n");
-  printf("%s",buf);
   sscanf(buf, "%s %s %s", method, uri, version);
   if ((strcasecmp(method, "GET") !=0) && (strcasecmp(method, "HEAD") !=0)) { // method가 HEAD나 GET이 아닐 때
     clienterror(proxy_connfd, method, "501", "Not implemented", "Proxy does not implement this method");
@@ -142,16 +137,16 @@ void read_requesthdrs(rio_t *rp) // tiny는 요청 헤더 내의 어떤 정보�
 
 
 
-<<<<<<< HEAD
 int parse_uri(char *server_name, char *server_port, char *uri, char *filename, char *cgiargs){
-    char uri2[100];
+    char uri2[MAXLINE];
+    // char server_name2[MAXLINE];
+    // char server_port2[MAXLINE];
+
     // ':'를 구분자로 tiny를 구한다
-    strcpy(uri2,uri);
-    server_name = strtok(uri2, ":");
+    strcpy(uri2, uri);
+    strcpy(server_name, strtok(uri2, ":"));
     // '/'를 구분자로 9999를 구한다
-    // printf("%s\n",server_name);
-    server_port = strtok(NULL, "/");
-    // printf("%s\n",server_port);
+    strcpy(server_port, strtok(NULL, "/"));
 
     if (uri[strlen(uri)-1] == '/'){
         strcpy(uri,"/");
@@ -173,37 +168,6 @@ int parse_uri(char *server_name, char *server_port, char *uri, char *filename, c
     return 0;
 }
 
-=======
-int parse_uri(char *server_name, char *server_port, char *uri, char *filename, char *cgiargs)
-{
-    char uri2[100];
-    strcpy(uri2, uri);
-    
-    char uri_with_slash[100];
-    uri_with_slash[0] = '/'; // '/' 문자 추가
-    uri_with_slash[1] = '\0'; // 문자열 끝을 표시
-    
-    // ':'를 구분자로 tiny를 구한다
-    server_name = strtok(uri2, ":");
-    // '/'를 구분자로 9999를 구한다
-    server_port = strtok(NULL, "/");
-    // 남은 부분을 그대로 uri2에 저장한다
-    char *uri_no_slash = strtok(NULL, "");
-    // 기존 문자열을 새로운 문자열에 이어붙임
-    
-    strcat(uri_with_slash, uri_no_slash);    // 결과 출력
-    
-    printf("server_name: %s\n", server_name);
-    printf("server_port: %s\n", server_port);
-    printf("uri_with_slash: %s\n", uri_with_slash);
-    strcpy(uri,uri_with_slash);
-    printf("uri: %s\n", uri);
-
-    return 0;
-}
-
-
->>>>>>> ca35c0b9baf5090bf269211b1aa6b5126d2bb8e3
 void proxy_to_tiny(char *server_name, char *server_port, char *uri, int proxy_fd){
     int server_fd;   //소켓식별자
     char *host, *port, buf[MAXLINE];
@@ -214,7 +178,6 @@ void proxy_to_tiny(char *server_name, char *server_port, char *uri, int proxy_fd
 
     server_fd = Open_clientfd(host, port);
     Rio_readinitb(&rio, server_fd);
-<<<<<<< HEAD
 
      // 클라이언트가 보낸 요청을 tiny 서버에 전달
     sprintf(buf, "GET %s HTTP/1.1\r\n", uri);
@@ -223,36 +186,13 @@ void proxy_to_tiny(char *server_name, char *server_port, char *uri, int proxy_fd
     // sprintf(buf, "%s\r\n", buf);
     Rio_writen(server_fd, buf, strlen(buf));
 
-=======
-
-     // 클라이언트가 보낸 요청을 tiny 서버에 전달
-    sprintf(buf, "GET %s HTTP/1.1\r\n", uri);
-    // sprintf(buf, "%sHost: %s\r\n", buf, host);
-    // sprintf(buf, "%sConnection: close\r\n", buf);
-    // sprintf(buf, "%s\r\n", buf);
-    Rio_writen(server_fd, buf, strlen(buf));
-
->>>>>>> ca35c0b9baf5090bf269211b1aa6b5126d2bb8e3
     // tiny 서버로부터의 응답을 클라이언트에 전달
     while (Rio_readlineb(&rio, buf, MAXLINE) > 0) {
         Rio_writen(proxy_fd, buf, strlen(buf));
     }
-<<<<<<< HEAD
-=======
 
-    // while (Fgets(buf, MAXLINE, uri) != NULL) {
-
-    //     Rio_writen(clientfd, buf, strlen(buf));
-    //     Rio_readlineb(&rio, buf, MAXLINE);
-    //     Fputs(buf, stdout);
-    // }
-    // Close(clientfd);
-    // exit(0);
-}
->>>>>>> ca35c0b9baf5090bf269211b1aa6b5126d2bb8e3
-
-    // Close(server_fd);
-    // exit(0);
+    Close(server_fd);
+    exit(0);
 }
 
 // file name으로부터 file type을 얻는다.
