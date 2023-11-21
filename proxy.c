@@ -9,9 +9,7 @@
 void doit(int fd);
 void read_requesthdrs(rio_t *rp);
 int parse_uri(char *server_name, char *server_port, char *uri, char *filename, char *cgiargs);
-void serve_static(char *method, int fd, char *filename, int filesize);
-void get_filetype(char *filename, char *filetype);
-void serve_dynamic(char *method, int fd, char *filename, char *cgiargs);
+
 void clienterror(int fd, char *cause, char *errnum, char *shortmsg,
                  char *longmsg);
 
@@ -75,32 +73,9 @@ void doit(int proxy_connfd)
   // GET 요청으로부터 URI 분할하기
   // GET tiny:9999/cgi-bin/adder?123&456 HTTP/1.1
   parse_uri(server_name, server_port, uri, filename, cgiargs);
-
+  printf("server_name: %s server_port: %s uri: %s filename: %s", server_name, server_port, uri, filename);
   proxy_to_tiny(server_name, server_port, uri, proxy_connfd);
-  /*
-  if (stat(filename, &sbuf)<0){ // 파일이 없으면? 인 듯
-    clienterror(fd, filename, "404", "Not found", "Tiny couldn't find this file");
-    return;
-  }
-
-  if (is_static){ // 정적 컨텐츠 serve하기
-    if (!(S_ISREG(sbuf.st_mode)) || !(S_IRUSR & sbuf.st_mode)){ // 파일이 있어도 접근할 수 없다면? 인 듯
-      clienterror(fd, filename, "403", "Forbidden", "Tiny couldn't read the file");
-      return;
-    }
-    serve_static(method, fd, filename, sbuf.st_size);
-  }
-  else{ // 동적 컨텐츠 serve하기
-    if (!(S_ISREG(sbuf.st_mode)) || !(S_IXUSR & sbuf.st_mode)){ // 파일이 있어도 접근할 수 없다면? 인 듯
-      clienterror(fd, filename, "403", "Forbidden", "Tiny couldn't run the CGI program");
-      return;
-    }
-    serve_dynamic(method, fd, filename, cgiargs);
-  }
-  */
-
 }
-
 
 void clienterror(int fd, char *cause, char *errnum, char *shortmsg, char *longmsg)
 {
@@ -135,38 +110,37 @@ void read_requesthdrs(rio_t *rp) // tiny는 요청 헤더 내의 어떤 정보�
   return;
 }
 
+int parse_uri(char *server_name, char *server_port, char *uri, char *filename, char *cgiargs)
+{
+    char parsed_uri[MAXLINE];
+    
+    char *parser_ptr=uri;
+    int i=0;
 
-
-int parse_uri(char *server_name, char *server_port, char *uri, char *filename, char *cgiargs){
-    char uri2[MAXLINE];
-    // char server_name2[MAXLINE];
-    // char server_port2[MAXLINE];
-
-    // ':'를 구분자로 tiny를 구한다
-    strcpy(uri2, uri);
-    strcpy(server_name, strtok(uri2, ":"));
-    // '/'를 구분자로 9999를 구한다
-    strcpy(server_port, strtok(NULL, "/"));
-
-    if (uri[strlen(uri)-1] == '/'){
-        strcpy(uri,"/");
-        printf("%s\n",uri);
+    while(*parser_ptr!=':'){
+        server_name[i]=*parser_ptr;
+        i++;
+        parser_ptr++;
     }
-    else{
-        char uri_with_slash[100];
-        uri_with_slash[0] = '/'; // '/' 문자 추가
-        uri_with_slash[1] = '\0'; // 문자열 끝을 표시
-        // 남은 부분을 그대로 uri2에 저장한다
-        // printf("%s\n",server_port);
-        // printf("%s\n",uri);
-        char *uri_no_slash = strtok(NULL, "");
-        // 기존 문자열을 새로운 문자열에 이어붙임
-        strcat(uri_with_slash, uri_no_slash);    // 결과 출력
-        // printf("uri_with_slash: %s\n", uri_with_slash);
-        strcpy(uri,uri_with_slash);
+    i=0;
+    parser_ptr++;
+    while(*parser_ptr!='/'){
+        server_port[i]=*parser_ptr;
+        i++;
+        parser_ptr++;
     }
+    i=0;
+    while(*parser_ptr){
+        parsed_uri[i]=*parser_ptr;
+        i++;
+        parser_ptr++;
+    }
+
+    strcpy(uri,parsed_uri);
+
     return 0;
 }
+
 
 void proxy_to_tiny(char *server_name, char *server_port, char *uri, int proxy_fd){
     int server_fd;   //소켓식별자
@@ -175,7 +149,7 @@ void proxy_to_tiny(char *server_name, char *server_port, char *uri, int proxy_fd
 
     host = server_name;     // 서버의 IP주소
     port = server_port;     // 서버의 포트
-
+    printf("%s %s\n", host, port);
     server_fd = Open_clientfd(host, port);
     Rio_readinitb(&rio, server_fd);
 
@@ -192,28 +166,5 @@ void proxy_to_tiny(char *server_name, char *server_port, char *uri, int proxy_fd
     }
 
     Close(server_fd);
-    exit(0);
-}
-
-// file name으로부터 file type을 얻는다.
-void get_filetype(char *filename, char *filetype)
-{
-  if (strstr(filename, ".html")){
-    strcpy(filetype, "text/html");
-  }
-  else if (strstr(filename, ".gif")){
-    strcpy(filetype, "image/gif");
-  }
-  else if (strstr(filename, ".png")){
-    strcpy(filetype, "image/png");
-  }
-  else if (strstr(filename, ".jpg")){
-    strcpy(filetype, "image/jpeg");
-  }
-  else if (strstr(filename, ".mp4")){
-    strcpy(filetype, "video/mp4");
-  }
-  else{
-    strcpy(filetype, "text/plain");
-  }
+    return;
 }
