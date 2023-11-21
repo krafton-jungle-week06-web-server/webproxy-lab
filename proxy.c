@@ -71,7 +71,6 @@ void doit(int fd)
   // GET localhost:9999/cgi-bin/adder?123&456 HTTP/1.1
   parse_uri(server_name, server_port, uri, filename, cgiargs);
   // server_name: localhost, server_port: 9999, uri: /cgi-bin/adder?123&456
-  printf("server_name: %s server_port: %s uri: %s filename: %s", server_name, server_port, uri, filename);
   proxy_to_tiny(server_name, server_port, uri, fd);
 }
 
@@ -152,8 +151,6 @@ void proxy_to_tiny(char *server_name, char *server_port, char *uri, int fd){
 
     host = server_name;     // 서버의 IP주소
     port = server_port;     // 서버의 포트
-
-    printf("host: %s port:%s\n", host, port);
 
     clientfd = Open_clientfd(host, port);
     Rio_readinitb(&rio, clientfd);
