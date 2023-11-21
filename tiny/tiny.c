@@ -11,9 +11,9 @@
 void doit(int fd);
 void read_requesthdrs(rio_t *rp);
 int parse_uri(char *uri, char *filename, char *cgiargs);
-void serve_static(char *method, int fd, char *filename, int filesize);
+void serve_static(int fd, char *filename, int filesize);
 void get_filetype(char *filename, char *filetype);
-void serve_dynamic(char *method, int fd, char *filename, char *cgiargs);
+void serve_dynamic(int fd, char *filename, char *cgiargs);
 void clienterror(int fd, char *cause, char *errnum, char *shortmsg,
                  char *longmsg);
 
@@ -24,18 +24,18 @@ int main(int argc, char **argv) {
   struct sockaddr_storage clientaddr;
 
   /* Check command line args */
+  /* ./tiny 9999 */
   if (argc != 2) {
     fprintf(stderr, "usage: %s <port>\n", argv[0]);
     exit(1);
   }
 
-  listenfd = Open_listenfd(argv[1]);
+  listenfd = Open_listenfd(argv[1]); // port 9999에서 듣기
   while (1) {
     clientlen = sizeof(clientaddr);
     connfd = Accept(listenfd, (SA *)&clientaddr,
                     &clientlen);  // line:netp:tiny:accept
-    Getnameinfo((SA *)&clientaddr, clientlen, hostname, MAXLINE, port, MAXLINE,
-                0);
+    Getnameinfo((SA *)&clientaddr, clientlen, hostname, MAXLINE, port, MAXLINE, 0);
     printf("Accepted connection from (%s, %s)\n", hostname, port);
     doit(connfd);   // line:netp:tiny:doit
     Close(connfd);  // line:netp:tiny:close
@@ -52,14 +52,16 @@ void doit(int fd)
 
   // request line과 header를 읽는다.
   Rio_readinitb(&rio, fd);
+  // request line
   Rio_readlineb(&rio, buf, MAXLINE);
   printf("Request headers:\n");
   printf("%s",buf);
   sscanf(buf, "%s %s %s", method, uri, version);
-  if ((strcasecmp(method, "GET") !=0) && (strcasecmp(method, "HEAD") !=0)) { // method가 HEAD나 GET이 아닐 때
+  if ((strcasecmp(method, "GET") !=0)) { // method가 HEAD나 GET이 아닐 때
     clienterror(fd, method, "501", "Not implemneted", "Tiny does not implement this method");
     return;
   }
+  // request header
   read_requesthdrs(&rio);
 
   // GET 요청으로부터 URI 분할하기
@@ -75,14 +77,14 @@ void doit(int fd)
       clienterror(fd, filename, "403", "Forbidden", "Tiny couldn't read the file");
       return;
     }
-    serve_static(method, fd, filename, sbuf.st_size);
+    serve_static(fd, filename, sbuf.st_size);
   }
   else{ // 동적 컨텐츠 serve하기
     if (!(S_ISREG(sbuf.st_mode)) || !(S_IXUSR & sbuf.st_mode)){ // 파일이 있어도 접근할 수 없다면? 인 듯
       clienterror(fd, filename, "403", "Forbidden", "Tiny couldn't run the CGI program");
       return;
     }
-    serve_dynamic(method, fd, filename, cgiargs);
+    serve_dynamic(fd, filename, cgiargs);
   }
 
 }
@@ -148,7 +150,7 @@ int parse_uri(char *uri, char *filename, char *cgiargs)
   }
 }
 
-void serve_static(char *method, int fd, char *filename, int filesize)
+void serve_static(int fd, char *filename, int filesize)
 {
   int srcfd;
   char *srcp, filetype[MAXLINE], buf[MAXBUF];
@@ -164,14 +166,12 @@ void serve_static(char *method, int fd, char *filename, int filesize)
   printf("Response headers:\n");
   printf("%s", buf);
 
-  if (strcmp(method, "GET") == 0) {
   // 클라이언트에게 응답 본체(response body)를 보낸다.
-    srcfd = Open(filename, O_RDONLY, 0); // 파일 열기
-    srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0); // 식별자랑 파일 정보들 매핑
-    Close(srcfd); // 파일 닫기
-    Rio_writen(fd, srcp, filesize); // 클라이언트에 보내기
-    Munmap(srcp, filesize); // 매핑 삭제
-  }
+  srcfd = Open(filename, O_RDONLY, 0); // 파일 열기
+  srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0); // 식별자랑 파일 정보들 매핑
+  Close(srcfd); // 파일 닫기
+  Rio_writen(fd, srcp, filesize); // 클라이언트에 보내기
+  Munmap(srcp, filesize); // 매핑 삭제
 
   /* Mmap => malloc 구현*/
   /*
@@ -213,7 +213,7 @@ void get_filetype(char *filename, char *filetype)
   }
 }
 
-void serve_dynamic(char *method, int fd, char *filename, char *cgiargs)
+void serve_dynamic(int fd, char *filename, char *cgiargs)
 {
   char buf[MAXLINE], *emptylist[] = { NULL };
 
@@ -224,7 +224,6 @@ void serve_dynamic(char *method, int fd, char *filename, char *cgiargs)
   Rio_writen(fd, buf, strlen(buf));
 
   if (Fork()==0){ // 자식
-    setenv("METHOD", method, 1);
     setenv("QUERY_STRING", cgiargs, 1);
     Dup2(fd, STDOUT_FILENO); // 클라이언트에게 표준 출력 redirect
     Execve(filename, emptylist, environ); // CGI 프로그램 실행
