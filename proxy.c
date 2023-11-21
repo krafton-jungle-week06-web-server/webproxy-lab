@@ -11,6 +11,7 @@ void read_requesthdrs(rio_t *rp);
 int parse_uri(char *server_name, char *server_port, char *uri, char *filename, char *cgiargs);
 void clienterror(int fd, char *cause, char *errnum, char *shortmsg, char *longmsg);
 void proxy_to_tiny(char *server_name, char *server_port, char *uri, int fd);
+void *thread(void *vargp);
 
 /* You won't lose style points for including this long line in your code */
 static const char *user_agent_hdr =
@@ -20,10 +21,11 @@ static const char *user_agent_hdr =
 int main(int argc, char **argv) {
   printf("%s", user_agent_hdr);
 
-  int listenfd, connfd;
+  int listenfd, *connfd;
   char hostname[MAXLINE], port[MAXLINE];
   socklen_t clientlen;
   struct sockaddr_storage clientaddr;
+  pthread_t tid;
 
   /* Check command line args */
   if (argc != 2) { // ./proxy 5555
@@ -34,14 +36,15 @@ int main(int argc, char **argv) {
   listenfd = Open_listenfd(argv[1]);
   while (1) {
     clientlen = sizeof(clientaddr);
-    connfd = Accept(listenfd, (SA *)&clientaddr,
+    connfd = Malloc(sizeof(int));
+    *connfd = Accept(listenfd, (SA *)&clientaddr,
                     &clientlen);  // line:netp:tiny:accept
+    
+    Pthread_create(&tid, NULL, thread, connfd);
+
     Getnameinfo((SA *)&clientaddr, clientlen, hostname, MAXLINE, port, MAXLINE,
                 0);
     printf("Accepted connection from (%s, %s)\n", hostname, port);
-    doit(connfd);   // line:netp:tiny:doit
-
-    Close(connfd);  // line:netp:tiny:close
   }
 
 
@@ -172,4 +175,14 @@ void proxy_to_tiny(char *server_name, char *server_port, char *uri, int fd){
 
     Close(clientfd);
     return;
+}
+
+void *thread(void *vargp){
+  printf("STart thread handler\n");
+  int connfd = *((int *)vargp);
+  Pthread_detach(pthread_self());
+  Free(vargp);
+  doit(connfd);   // line:netp:tiny:doit
+  Close(connfd);  // line:netp:tiny:close
+  return NULL;
 }
