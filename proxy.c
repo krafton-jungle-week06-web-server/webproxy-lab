@@ -108,9 +108,11 @@ void read_requesthdrs(rio_t *rp) // tiny는 요청 헤더 내의 어떤 정보�
 
 int parse_uri(char *server_name, char *server_port, char *uri, char *filename, char *cgiargs)
 {
+    // http://localhost:9999/cgi-bin/adder?123&456
     char parsed_uri[MAXLINE]={0};
     
-    char *parser_ptr=uri;
+    char *parser_ptr = strstr(uri, "//") ? strstr(uri, "//") + 2 : uri;
+
     int i=0;
     // int length=strlen(*uri);
     // int cnt=0;
