@@ -16,12 +16,15 @@ void get_filetype(char *filename, char *filetype);
 void serve_dynamic(int fd, char *filename, char *cgiargs);
 void clienterror(int fd, char *cause, char *errnum, char *shortmsg,
                  char *longmsg);
+/*멀티스레드*/
+void *thread(void *vargp);
 
 int main(int argc, char **argv) {
-  int listenfd, connfd;
+  int listenfd, *connfd;
   char hostname[MAXLINE], port[MAXLINE];
   socklen_t clientlen;
   struct sockaddr_storage clientaddr;
+  pthread_t tid;
 
   /* Check command line args */
   /* ./tiny 9999 */
@@ -33,12 +36,14 @@ int main(int argc, char **argv) {
   listenfd = Open_listenfd(argv[1]); // port 9999에서 듣기
   while (1) {
     clientlen = sizeof(clientaddr);
-    connfd = Accept(listenfd, (SA *)&clientaddr,
+    connfd = Malloc(sizeof(int));
+    *connfd = Accept(listenfd, (SA *)&clientaddr,
                     &clientlen);  // line:netp:tiny:accept
+    printf("Complete Accept\n");                
+    Pthread_create(&tid, NULL, thread, connfd);
+
     Getnameinfo((SA *)&clientaddr, clientlen, hostname, MAXLINE, port, MAXLINE, 0);
     printf("Accepted connection from (%s, %s)\n", hostname, port);
-    doit(connfd);   // line:netp:tiny:doit
-    Close(connfd);  // line:netp:tiny:close
   }
 }
 
@@ -229,4 +234,14 @@ void serve_dynamic(int fd, char *filename, char *cgiargs)
     Execve(filename, emptylist, environ); // CGI 프로그램 실행
   }
   Wait(NULL); // 부모가 자식을 기다리고 회수한다. doit 함수에서 한 번에 한 개의 HTTP 트랜잭션만 처리하기 때문이다.
+}
+
+void *thread(void *vargp){
+  printf("STart thread handler\n");
+  int connfd = *((int *)vargp);
+  Pthread_detach(pthread_self());
+  Free(vargp);
+  doit(connfd);   // line:netp:tiny:doit
+  Close(connfd);  // line:netp:tiny:close
+  return NULL;
 }
