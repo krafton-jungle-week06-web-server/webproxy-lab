@@ -64,6 +64,7 @@ void doit(int fd)
 
   // GET 요청으로부터 URI 분할하기
   is_static = parse_uri(uri, filename, cgiargs);
+  printf("%s %s %s\n",uri, filename, cgiargs);
   if (stat(filename, &sbuf)<0){ // 파일이 없으면? 인 듯
     clienterror(fd, filename, "404", "Not found", "Tiny couldn't find this file");
     return;
