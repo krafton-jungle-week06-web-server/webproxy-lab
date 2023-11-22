@@ -1,8 +1,8 @@
 #include <stdio.h>
 #include <string.h>
+#define MAXLINE 8092
 
-
-int main(void){
+int main(){
     char uri[100]="localhost:9999/";
     char server_name[100];
     char server_port[100];
